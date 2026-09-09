@@ -11,7 +11,7 @@ namespace Voting_Server_App.Context
         public DbSet<User> Users { get; set; }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=VotingDB;Trusted_Connection=True;");
+            optionsBuilder.UseSqlite("Data Source=Voting.db");
         }
 
     }
