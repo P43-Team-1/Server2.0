@@ -43,10 +43,10 @@ namespace Voting_Server_App
                     button3.BeginInvoke(() => { button3.Enabled = true; });
                     return;
                 }
+                button2.BeginInvoke(() => { button2.Enabled = true; });
+                Task.Run(() => { script.StartServer(); });
+                LogMessage("Server is now running and ready to accept connections.");
             });
-            button2.Enabled = true;
-            Task.Run(() => { script.StartServer(); });
-            LogMessage("Server is now running and ready to accept connections.");
         }
 
         private async void button3_Click(object sender, EventArgs e)

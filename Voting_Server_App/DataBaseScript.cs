@@ -15,6 +15,8 @@ namespace Voting_Server_App
             using (var context = new Context.VoteContext())
             {
                 context.Database.EnsureCreated();
+                context.Users.Add(new Tables.User { Login = "admin", EncryptedPassword = "hello_world", NickName = "Administrator", Role = "Admin" });
+                context.SaveChanges();
             }
         }
         private bool ServerRunning = false;
@@ -33,10 +35,45 @@ namespace Voting_Server_App
                     client = listener.Accept();
                 }
                 catch { break; }
-                string message = "Welcome to the Voting Server!";
-                byte[] buffer = Encoding.UTF8.GetBytes(message);
-                client.Send(buffer);
-                client.Close();
+                Task.Run(() => HandleClient(client));
+            }
+        }
+
+        public void HandleClient(Socket socket)
+        {
+            byte[] buffer = new byte[1024];
+            int len = socket.Receive(buffer);
+
+            if(len == 0) { socket.Close(); return; };
+            
+            string request = Encoding.UTF8.GetString(buffer, 0, len);
+            string[] packets = request.Split(';');
+            if (packets[0] == "login")
+            {
+                CheckLogin(packets[1], packets[2], socket);
+            }
+            else if(packets[0] == "register")
+            {
+
+            }
+            else if (packets[0] == "vote")
+            {
+
+            }
+            socket.Close();
+        }
+
+        private void CheckLogin(string login, string password, Socket socket)
+        {   
+            using var context = new Context.VoteContext();
+            var user = context.Users.FirstOrDefault(u => u.Login == login);
+            if (user != null && user.EncryptedPassword == password)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("login_success"));
+            }
+            else
+            {
+                socket.Send(Encoding.UTF8.GetBytes("login_failed"));
             }
         }
 
