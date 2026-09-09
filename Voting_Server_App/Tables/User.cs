@@ -10,5 +10,6 @@ namespace Voting_Server_App.Tables
         public string Login { get; set; } = default!;
         public string EncryptedPassword { get; set; } = default!;
         public string NickName { get; set; } = default!;
+        public string Role { get; set; } = default!;
     }
 }
