@@ -15,7 +15,7 @@ namespace Voting_Server_App
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+         
         }
 
         private bool CheckDataBase()
@@ -46,6 +46,10 @@ namespace Voting_Server_App
                 button2.BeginInvoke(() => { button2.Enabled = true; });
                 Task.Run(() => { script.StartServer(); });
                 LogMessage("Server is now running and ready to accept connections.");
+                label1.BeginInvoke(() =>
+                {
+                    label1.Text = "Status: Online";
+                });
             });
         }
 
@@ -77,6 +81,10 @@ namespace Voting_Server_App
             button1.Enabled = true;
             button3.Enabled = true;
             LogMessage("Database server stopped.");
+            label1.BeginInvoke(() =>
+            {
+                label1.Text = "Status: Offline";
+            });
         }
     }
 }
