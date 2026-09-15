@@ -27,6 +27,7 @@ namespace Voting_Server_App
             listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             listener.Bind(localEP);
             listener.Listen(10);
+            Task.Run(() => BroadcastListener());
             while (true)
             {
                 Socket client;
@@ -36,6 +37,27 @@ namespace Voting_Server_App
                 }
                 catch { break; }
                 Task.Run(() => HandleClient(client));
+            }
+        }
+
+        public void BroadcastListener()
+        {
+            var listener = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            listener.Bind(new IPEndPoint(IPAddress.Any, 4568));
+
+            byte[] buffer = new byte[1024];
+            EndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
+
+            while (true)
+            {
+                int len = listener.ReceiveFrom(buffer, ref remoteEP);
+                string message = Encoding.UTF8.GetString(buffer, 0, len);
+                if (message == "discover_server")
+                {
+                    string response = "server_here";
+                    byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+                    listener.SendTo(responseBytes, remoteEP);
+                }
             }
         }
 
@@ -69,7 +91,7 @@ namespace Voting_Server_App
             var user = context.Users.FirstOrDefault(u => u.Login == login);
             if (user != null && user.EncryptedPassword == password)
             {
-                socket.Send(Encoding.UTF8.GetBytes("login_success"));
+                socket.Send(Encoding.UTF8.GetBytes($"login_success;{user.NickName}"));
             }
             else
             {
