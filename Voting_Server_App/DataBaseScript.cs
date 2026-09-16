@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net.Sockets;
 using System.Net;
+using Voting_Server_App.Tables;
 
 namespace Voting_Server_App
 {
@@ -83,7 +84,7 @@ namespace Voting_Server_App
             }
             else if(packets[0] == "register")
             {
-
+                Registration(packets[1], packets[2], packets[3], socket);
             }
             else if (packets[0] == "vote")
             {
@@ -113,6 +114,32 @@ namespace Voting_Server_App
             }
         }
 
+        private void Registration(string login, string password, string nickname, Socket socket)
+        {
+            using var context = new Context.VoteContext();
+            var existingUser = context.Users.FirstOrDefault(u => u.Login == login);
+            if (existingUser != null)
+            {
+                Log($"Register failed: login '{login}' in use");
+                socket.Send(Encoding.UTF8.GetBytes("register_failed; UserName in use"));
+                return;
+            }
+            string decryptedPassword = Encoding.UTF8.GetString(Convert.FromBase64String(password));
+
+                var NewUser = new User
+                {
+                    Login = login,
+                    EncryptedPassword = decryptedPassword,
+                    NickName = nickname,
+                    Role = "User"
+                };
+                context.Users.AddAsync(NewUser);
+                context.SaveChanges();
+
+                Log($"New user success register: {login}");
+                socket.Send(Encoding.UTF8.GetBytes("register_success"));
+                return;
+        }
         public void StopServer()
         {
             ServerRunning = false;
