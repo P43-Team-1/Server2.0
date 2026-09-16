@@ -10,6 +10,13 @@ namespace Voting_Server_App
     {
         IPEndPoint localEP;
         Socket listener;
+
+        public event Action<string> OnLogMessage;
+
+        private void Log(string message)
+        {
+            OnLogMessage?.Invoke(message);
+        }
         public void CreateDatabase()
         {
             using (var context = new Context.VoteContext())
@@ -89,13 +96,20 @@ namespace Voting_Server_App
         {   
             using var context = new Context.VoteContext();
             var user = context.Users.FirstOrDefault(u => u.Login == login);
-            if (user != null && user.EncryptedPassword == password)
+            string DecryptPassword = null;
+            try { DecryptPassword = Encoding.UTF8.GetString(Convert.FromBase64String(password)); }
+            catch { }
+            
+
+            if (user != null && user.EncryptedPassword == DecryptPassword)
             {
-                socket.Send(Encoding.UTF8.GetBytes($"login_success;{user.NickName}"));
+                socket.Send(Encoding.UTF8.GetBytes($"login_success;{user.NickName};{user.Role}"));
+                Log($"User {login} login");
             }
             else
             {
                 socket.Send(Encoding.UTF8.GetBytes("login_failed"));
+                Log($"User {login} not found. Login failed");
             }
         }
 

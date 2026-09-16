@@ -7,10 +7,12 @@ namespace Voting_Server_App
     {
         VoteContext context;
         DataBaseScript script = new DataBaseScript();
+
         public Form1()
         {
             InitializeComponent();
             context = new VoteContext();
+            script.OnLogMessage += LogMessage;
         }
 
         private void Form1_Load(object sender, EventArgs e)
