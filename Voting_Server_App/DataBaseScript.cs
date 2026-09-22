@@ -22,6 +22,7 @@ namespace Voting_Server_App
         {
             using (var context = new Context.VoteContext())
             {
+                context.Database.EnsureDeleted();
                 context.Database.EnsureCreated();
                 context.Users.Add(new Tables.User { Login = "admin", EncryptedPassword = "hello_world", NickName = "Administrator", Role = "Admin" });
                 context.SaveChanges();
