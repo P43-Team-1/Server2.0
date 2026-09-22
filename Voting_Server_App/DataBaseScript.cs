@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Net.Sockets;
 using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using Voting_Server_App.Tables;
 
 namespace Voting_Server_App
@@ -72,30 +73,66 @@ namespace Voting_Server_App
 
         public void HandleClient(Socket socket)
         {
-            byte[] buffer = new byte[4096];
-            int len = socket.Receive(buffer);
+            try {
+                byte[] buffer = new byte[4096];
+                int len = socket.Receive(buffer);
 
-            if(len == 0) { socket.Close(); return; };
-            
-            string request = Encoding.UTF8.GetString(buffer, 0, len);
-            string[] packets = request.Split(';');
-            if (packets[0] == "login")
-            {
-                CheckLogin(packets[1], packets[2], socket);
+                if (len == 0) { socket.Close(); return; }
+                ;
+
+                string request = Encoding.UTF8.GetString(buffer, 0, len);
+                string[] packets = request.Split(';');
+                if (packets[0] == "login")
+                {
+                    CheckLogin(packets[1], packets[2], socket);
+                }
+                else if (packets[0] == "register")
+                {
+                    Registration(packets[1], packets[2], packets[3], socket);
+                }
+                else if (packets[0] == "vote")
+                {
+
+                }
+                else if (packets[0] == "create_vote")
+                {
+                    CreateVote(packets[1], packets[2], packets[3], socket);
+                }
+                else if (packets[0] == "get_votes")
+                {
+                    GetVotes(socket);
+                }
             }
-            else if(packets[0] == "register")
+            catch (Exception ex)
             {
-                Registration(packets[1], packets[2], packets[3], socket);
+                Log($"Error: {ex.Message}");
             }
-            else if (packets[0] == "vote")
+            finally
             {
-                
-            }
-            else if (packets[0] == "create_vote")
+                socket.Close();
+            }            
+        }
+
+        private void GetVotes(Socket socket)
+        {
+            using var context = new Context.VoteContext();
+
+            var activeVotes = context.Votes
+                .Include(v => v.Options)
+                .ThenInclude(o => o.UserVotes) 
+                .Where(v => v.IsActive && v.EndDate > DateTime.Now)
+                .ToList();
+
+            var voteEntries = activeVotes.Select(v =>
             {
-                CreateVote(packets[1], packets[2], packets[3], socket);
-            }
-            socket.Close();
+                int totalVotes = v.Options.Sum(o => o.UserVotes.Count);
+                return $"{v.Id},{v.Title},{totalVotes}";
+            });
+
+            string response = "votes_list;" + string.Join("|", voteEntries);
+
+            socket.Send(Encoding.UTF8.GetBytes(response));
+            Log($"Send a vote list({activeVotes.Count}.)");
         }
 
         private void CheckLogin(string login, string password, Socket socket)
