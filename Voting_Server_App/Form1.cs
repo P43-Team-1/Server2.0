@@ -68,7 +68,7 @@ namespace Voting_Server_App
         private void LogMessage(string message)
         {
             StringBuilder sb = new StringBuilder(textBox1.Text);
-            sb.AppendLine(message);
+            sb.AppendLine($"[{DateTime.Now.ToShortTimeString()}] {message}");
             textBox1.BeginInvoke(() => { textBox1.Text = sb.ToString(); });
         }
 
