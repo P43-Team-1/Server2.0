@@ -72,7 +72,7 @@ namespace Voting_Server_App
 
         public void HandleClient(Socket socket)
         {
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[4096];
             int len = socket.Receive(buffer);
 
             if(len == 0) { socket.Close(); return; };
@@ -89,7 +89,11 @@ namespace Voting_Server_App
             }
             else if (packets[0] == "vote")
             {
-
+                
+            }
+            else if (packets[0] == "create_vote")
+            {
+                CreateVote(packets[1], packets[2], packets[3], socket);
             }
             socket.Close();
         }
@@ -134,13 +138,62 @@ namespace Voting_Server_App
                     NickName = nickname,
                     Role = "User"
                 };
-                context.Users.AddAsync(NewUser);
+                context.Users.Add(NewUser);
                 context.SaveChanges();
 
                 Log($"New user success register: {login}");
                 socket.Send(Encoding.UTF8.GetBytes("register_success"));
                 return;
         }
+
+        private void CreateVote(string title, string voteOptions, string endTime, Socket socket)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    socket.Send(Encoding.UTF8.GetBytes("create_vote_failed;empty_title"));
+                    return;
+                }
+
+                string[] options = voteOptions.Split('|', StringSplitOptions.RemoveEmptyEntries);
+                if (options.Length < 2)
+                {
+                    socket.Send(Encoding.UTF8.GetBytes("create_vote_failed;not_enough_options"));
+                    return;
+                }
+                DateTime endDateTime = DateTime.Parse(endTime, null, System.Globalization.DateTimeStyles.RoundtripKind);
+
+                if(endDateTime < DateTime.Now)
+                {
+                    socket.Send(Encoding.UTF8.GetBytes("create_vote_failed;invalid_date"));
+                    return;
+                }
+
+                using var context = new Context.VoteContext();
+                var newVote = new Vote
+                {
+                    Title = title,
+                    StartDate = DateTime.Now,
+                    EndDate = endDateTime,
+                    IsActive = true
+                };
+                foreach (string optionText in options)
+                {
+                    newVote.Options.Add(new Tables.VoteOption { Text = optionText.Trim() });
+                }
+
+                context.Votes.Add(newVote);
+                context.SaveChanges();
+                Log($"Створено голосування: '{title}' ({options.Length} варіантів), завершення: {endDateTime:g}");
+                socket.Send(Encoding.UTF8.GetBytes("create_vote_success"));
+            }
+            catch (Exception ex) {
+                Log($"Помилка створення голосування: {ex.Message}");
+                socket.Send(Encoding.UTF8.GetBytes("create_vote_failed;server_error"));
+            }
+        }
+
         public void StopServer()
         {
             ServerRunning = false;
