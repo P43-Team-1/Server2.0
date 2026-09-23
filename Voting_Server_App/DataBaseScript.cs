@@ -102,6 +102,10 @@ namespace Voting_Server_App
                 {
                     GetVotes(socket);
                 }
+                else if (packets[0] == "get_vote_options")
+                {
+                    GetVoteOptions(packets[1], socket);
+                }
             }
             catch (Exception ex)
             {
@@ -229,6 +233,28 @@ namespace Voting_Server_App
                 Log($"Помилка створення голосування: {ex.Message}");
                 socket.Send(Encoding.UTF8.GetBytes("create_vote_failed;server_error"));
             }
+        }
+
+        private void GetVoteOptions(string voteIdStr, Socket socket)
+        {
+            if (!int.TryParse(voteIdStr, out int voteId))
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_options_failed;invalid_id"));
+                return;
+            }
+
+            using var context = new Context.VoteContext();
+            var vote = context.Votes.Include(v => v.Options).FirstOrDefault(v => v.Id == voteId);
+
+            if (vote == null)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_options_failed;not_found"));
+                return;
+            }
+
+            var entries = vote.Options.Select(o => $"{o.Id},{o.Text}");
+            string response = $"vote_options;{vote.Title};" + string.Join("|", entries);
+            socket.Send(Encoding.UTF8.GetBytes(response));
         }
 
         public void StopServer()
