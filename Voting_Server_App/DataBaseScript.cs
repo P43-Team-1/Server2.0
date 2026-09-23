@@ -150,7 +150,7 @@ namespace Voting_Server_App
 
             if (user != null && user.EncryptedPassword == DecryptPassword)
             {
-                socket.Send(Encoding.UTF8.GetBytes($"login_success;{user.NickName};{user.Role}"));
+                socket.Send(Encoding.UTF8.GetBytes($"login_success;{user.NickName};{user.Role};{user.Id}"));
                 Log($"User {login} login");
             }
             else
