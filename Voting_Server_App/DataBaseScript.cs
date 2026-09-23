@@ -92,7 +92,7 @@ namespace Voting_Server_App
                 }
                 else if (packets[0] == "vote")
                 {
-
+                    CastVote(packets[1], packets[2], packets[3], socket);
                 }
                 else if (packets[0] == "create_vote")
                 {
@@ -226,7 +226,7 @@ namespace Voting_Server_App
 
                 context.Votes.Add(newVote);
                 context.SaveChanges();
-                Log($"Створено голосування: '{title}' ({options.Length} варіантів), завершення: {endDateTime:g}");
+                Log($"Created voting: '{title}' ({options.Length} options), EndTime: {endDateTime:g}");
                 socket.Send(Encoding.UTF8.GetBytes("create_vote_success"));
             }
             catch (Exception ex) {
@@ -255,6 +255,51 @@ namespace Voting_Server_App
             var entries = vote.Options.Select(o => $"{o.Id},{o.Text}");
             string response = $"vote_options;{vote.Title};" + string.Join("|", entries);
             socket.Send(Encoding.UTF8.GetBytes(response));
+        }
+
+        private void CastVote(string voteIdStr, string optionIdStr, string login, Socket socket)
+        {
+            if (!int.TryParse(voteIdStr, out int voteId) || !int.TryParse(optionIdStr, out int optionId))
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_failed;invalid_data"));
+                return;
+            }
+
+            using var context = new Context.VoteContext();
+
+            var user = context.Users.FirstOrDefault(u => u.Login == login);
+            if (user == null)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_failed;user_not_found"));
+                return;
+            }
+
+            var vote = context.Votes.Include(v => v.Options).FirstOrDefault(v => v.Id == voteId);
+            if (vote == null || !vote.IsActive || vote.EndDate < DateTime.Now)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_failed;vote_closed"));
+                return;
+            }
+
+            var option = vote.Options.FirstOrDefault(o => o.Id == optionId);
+            if (option == null)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_failed;invalid_option"));
+                return;
+            }
+
+            bool alreadyVoted = context.UserVotes.Any(uv => uv.UserId == user.Id && uv.VoteOption.VoteId == voteId);
+            if (alreadyVoted)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_failed;already_voted"));
+                return;
+            }
+
+            context.UserVotes.Add(new Tables.UserVote { UserId = user.Id, VoteOptionId = optionId });
+            context.SaveChanges();
+
+            Log($"{login} voted in #{voteId} for '{option.Text}'");
+            socket.Send(Encoding.UTF8.GetBytes("vote_success"));
         }
 
         public void StopServer()
