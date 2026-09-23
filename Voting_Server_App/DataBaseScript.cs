@@ -106,6 +106,14 @@ namespace Voting_Server_App
                 {
                     GetVoteOptions(packets[1], socket);
                 }
+                else if (packets[0] == "get_vote_results")
+                {
+                    GetVoteResults(packets[1], socket);
+                }
+                else if (packets[0] == "get_vote_status")
+                {
+                    GetVoteStatus(packets[1], packets[2], socket);
+                }
             }
             catch (Exception ex)
             {
@@ -167,7 +175,7 @@ namespace Voting_Server_App
             if (existingUser != null)
             {
                 Log($"Register failed: login '{login}' in use");
-                socket.Send(Encoding.UTF8.GetBytes("register_failed; UserName in use"));
+                socket.Send(Encoding.UTF8.GetBytes("register_failed; Login in use"));
                 return;
             }
             string decryptedPassword = Encoding.UTF8.GetString(Convert.FromBase64String(password));
@@ -300,6 +308,71 @@ namespace Voting_Server_App
 
             Log($"{login} voted in #{voteId} for '{option.Text}'");
             socket.Send(Encoding.UTF8.GetBytes("vote_success"));
+        }
+
+        private void GetVoteResults(string voteIdStr, Socket socket)
+        {
+            if (!int.TryParse(voteIdStr, out int voteId))
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_results_failed;invalid_id"));
+                return;
+            }
+
+            using var context = new Context.VoteContext();
+            var vote = context.Votes
+                .Include(v => v.Options)
+                    .ThenInclude(o => o.UserVotes)
+                .FirstOrDefault(v => v.Id == voteId);
+
+            if (vote == null)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_results_failed;not_found"));
+                return;
+            }
+
+            int totalVotes = vote.Options.Sum(o => o.UserVotes.Count);
+
+            var entries = vote.Options.Select(o =>
+            {
+                int count = o.UserVotes.Count;
+                double percentage = totalVotes == 0 ? 0 : (double)count / totalVotes * 100;
+                string pctStr = percentage.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+                return $"{o.Id},{o.Text},{count},{pctStr}";
+            });
+
+            string response = $"vote_results;{vote.Title};" + string.Join("|", entries);
+            socket.Send(Encoding.UTF8.GetBytes(response));
+        }
+
+        private void GetVoteStatus(string voteIdStr, string login, Socket socket)
+        {
+            if (!int.TryParse(voteIdStr, out int voteId))
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_status;not_voted"));
+                return;
+            }
+
+            using var context = new Context.VoteContext();
+
+            var user = context.Users.FirstOrDefault(u => u.Login == login);
+            if (user == null)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_status;not_voted"));
+                return;
+            }
+
+            var userVote = context.UserVotes
+                .Include(uv => uv.VoteOption)
+                .FirstOrDefault(uv => uv.UserId == user.Id && uv.VoteOption.VoteId == voteId);
+
+            if (userVote == null)
+            {
+                socket.Send(Encoding.UTF8.GetBytes("vote_status;not_voted"));
+            }
+            else
+            {
+                socket.Send(Encoding.UTF8.GetBytes($"vote_status;voted;{userVote.VoteOptionId}"));
+            }
         }
 
         public void StopServer()
